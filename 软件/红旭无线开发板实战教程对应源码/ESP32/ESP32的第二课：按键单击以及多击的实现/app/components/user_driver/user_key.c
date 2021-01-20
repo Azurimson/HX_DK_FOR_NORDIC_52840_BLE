@@ -40,6 +40,9 @@ static uint64_t gs_key_transition = 0;
 static uint8_t gs_key_counts;
 /* 存放传进来的按键设置参数 */
 static key_config_t *gs_m_key_config = NULL;
+/*		保存当前被触发的按键的在按键数组中的地址		*/
+key_config_t* current_triggered_key = NULL;
+
 /*
 ===========================
 函数定义
@@ -69,6 +72,7 @@ static void short_pressed_cb(uint8_t pin_no, uint8_t key_action)
   {
   case APP_KEY_PUSH:
     esp_timer_stop(gs_m_key_time_params.short_press_time_handle);
+    current_triggered_key = s_m_key_config;
     esp_timer_start_once(gs_m_key_time_params.long_press_time_handle, s_m_key_config->long_pressed_time);
     ESP_LOGI("short_pressed_cb", "APP_KEY_PUSH\n");
     break;
@@ -79,7 +83,8 @@ static void short_pressed_cb(uint8_t pin_no, uint8_t key_action)
     // ESP_LOGI("short_pressed_cb", "current_time - last_time is %lld\n", current_time - last_time);
     if ((current_time - last_time) < MULTI_PRESSED_TIMER)
     {
-      s_m_key_config->short_pressed_counts++;      
+      s_m_key_config->short_pressed_counts++;   
+      current_triggered_key = s_m_key_config;
       esp_timer_start_once(gs_m_key_time_params.short_press_time_handle, SHORT_PRESS_DELAY_CHECK);
     }
     else
@@ -102,8 +107,8 @@ static void short_pressed_cb(uint8_t pin_no, uint8_t key_action)
  */
 static void short_press_time_out_handle(void *arg)
 {
-  key_config_t *s_key_config = (key_config_t *)arg;  
-  gs_m_key_param.short_press_callback(s_key_config->key_number,&(s_key_config->short_pressed_counts));  
+  //key_config_t *s_key_config = (key_config_t *)arg;  
+  gs_m_key_param.short_press_callback(current_triggered_key->key_number,&(current_triggered_key->short_pressed_counts));  
 }
 
 /** 
@@ -116,8 +121,8 @@ static void short_press_time_out_handle(void *arg)
  */
 static void long_press_time_out_handle(void *arg)
 {
-  key_config_t *s_key_config = (key_config_t *)arg;  
-  gs_m_key_param.long_press_callback(s_key_config->key_number,&(s_key_config->short_pressed_counts)); 
+  //key_config_t *s_key_config = (key_config_t *)arg;  
+  gs_m_key_param.long_press_callback(current_triggered_key->key_number,&(current_triggered_key->short_pressed_counts)); 
 }
 /** 
  * 消抖之后的按键处理函数,判断是哪个GPIO口以及对应的电平
@@ -319,7 +324,7 @@ int32_t user_key_init(key_config_t *key_config,
   esp_timer_create_args_t esp_short_press_timer_args = 
   {
     .callback         = short_press_time_out_handle,
-    .arg              = key_config,
+    //.arg              = key_config,
     .dispatch_method  = ESP_TIMER_TASK,
     .name             = "esp_short_press_timer",
   };
@@ -333,7 +338,7 @@ int32_t user_key_init(key_config_t *key_config,
   esp_timer_create_args_t esp_long_press_timer_args = 
   {
     .callback         = long_press_time_out_handle,
-    .arg              = key_config,
+    //.arg              = key_config,
     .dispatch_method  = ESP_TIMER_TASK,
     .name             = "esp_long_press_timer",
   };
